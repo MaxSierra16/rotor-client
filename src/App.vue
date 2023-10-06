@@ -5,18 +5,24 @@ import { ref } from "vue";
 const socket = io("http://localhost:3000");
 
 const rotation = ref(360 - 18)
+const isProcessingFile = ref(false)
 
-function moveRotor(slotNum){
-  rotation.value = 360 - (((20+2) - slotNum) * 18)
+function moveRotor(slotNum) {
+  rotation.value = 360 - (((20 + 2) - slotNum) * 18)
 }
 
-function loadFile(){
-  //@ts-ignore
-  const file = document.querySelector('#commandFile').files[0]
+function loadFile(e) {
+  
+  const [ file ] = e.target.files
 
-  if(!file) return alert("No file selected")
+  const errorConditions = !file || file.size > 5_000
+  const errorMessage = "Wrong file format or file over size limit."
 
-  socket.emit('command-file', file)
+  if (errorConditions) return alert(errorMessage)
+
+  socket.emit('commands-from-file', file)
+
+  isProcessingFile.value = true
 }
 
 
@@ -33,7 +39,11 @@ function loadFile(){
 // }
 
 
-socket.on("server_response", (res) => alert(res) )
+socket.on("refresh_from_server", (res) => {
+  alert(res)
+  location.reload() 
+  isProcessingFile.value = false
+})
 
 </script>
 
@@ -48,23 +58,37 @@ socket.on("server_response", (res) => alert(res) )
       <button v-for="n in 20" :key="n" :onclick="() => console.log(n)">slot: {{ n }}</button>
     </div> -->
 
-    <div class="rotor" :style="{ transform: `rotate(${rotation}deg)`}">
+    <div class="rotor" :style="{ transform: `rotate(${rotation}deg)` }">
 
-      <div
-          v-for="n in 20" class="slot" 
-          :style="{ transform: `rotate(${-(n * 18)}deg) translate(100px)` }"
-          :onclick="() => moveRotor(n)"
-          >
-          {{ n }}
-        </div>
-    
+      <div v-for="n in 20" class="slot" :style="{ transform: `rotate(${-(n * 18)}deg) translate(100px)` }"
+        :onclick="() => moveRotor(n)">
+        {{ n }}
+      </div>
+
     </div>
 
-    <div class="file-picker">
-      <label for="commandFile">Select a file:</label>
-      <input type="file" id="commandFile" name="commandFile">
-      <button class="load-file" :onclick="loadFile">Load File</button>
-    </div>
+
+    <label 
+      for="commandFile" 
+      class="load-label" 
+      :style="{ display: `${isProcessingFile? 'none': 'block'}` }">
+      Choose a file 📝
+      <input 
+        type="file" 
+        id="commandFile" 
+        name="commandFile" 
+        accept=".yaml, .yml" 
+        @change="loadFile" 
+        :disabled="isProcessingFile"
+        />
+    </label>
+
+    <p 
+      class=""
+      :style="{ display: `${isProcessingFile? 'block': 'none'}` }">
+      Running sequence from configuration file.
+    </p>
+
 
     <footer>
       <small>This is only for testing purposes 🧪</small>
@@ -92,10 +116,9 @@ socket.on("server_response", (res) => alert(res) )
   width: 200px;
   height: 200px;
   border-radius: 50%;
-  
+
   position: relative;
-  transition: transform 3s ease-in-out 0.2s;
-  /* animation-direction: normal; */
+  transition: transform 2.2s ease-in-out 0.2s;
 }
 
 .slot {
@@ -110,12 +133,11 @@ socket.on("server_response", (res) => alert(res) )
   left: calc(50% - 10px);
 }
 
-.file-picker {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
+.load-label {
+
 }
 
+input[type="file"] {
+  display: none; 
+}
 </style>
